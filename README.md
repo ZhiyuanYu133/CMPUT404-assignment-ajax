@@ -12,4 +12,6 @@ Contributors / Licensing
 
 Generally everything is LICENSE'D under the Apache 2 license by Abram Hindle.
 
+Referenced website url: https://cloud.tencent.com/developer/article/1114175
+
 

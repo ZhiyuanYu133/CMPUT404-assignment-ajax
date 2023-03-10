@@ -74,27 +74,37 @@ def flask_post_json():
 @app.route("/")
 def hello():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    return None
+    return app.send_static_file('index.html')
 
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
     '''update the entities via this interface'''
-    return None
+    data = request.json
+    myWorld.set(entity, data)
+    return json.dumps(myWorld.get(entity))
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
     '''you should probably return the world here'''
-    return None
+    return json.dumps(myWorld.world())
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
     '''This is the GET version of the entity interface, return a representation of the entity'''
-    return None
+    return json.dumps(myWorld.get(entity))
+
+@app.route("/new_entity/<entity>")
+def new_get_entity(entity):
+    '''This is the GET version of the new entity interface,
+    return a representation of the entity including entity name'''
+    result = dict()
+    result[entity] = myWorld.get(entity)
+    return json.dumps(result)
 
 @app.route("/clear", methods=['POST','GET'])
 def clear():
     '''Clear the world out!'''
-    return None
+    return json.dumps({})
 
 if __name__ == "__main__":
     app.run()

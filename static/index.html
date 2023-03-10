@@ -40,6 +40,8 @@ function sendJSONXMLHTTPRequest(url, objects, callback) {
                 if (xhr.status==200) {
                     //XXX: parse some JSON from the request!
                     //XXX: Pass the data to the callback!
+                    var result = JSON.parse(xhr.responseText);
+                    callback(result);
                 }
             } 
             catch(e) {
@@ -50,6 +52,9 @@ function sendJSONXMLHTTPRequest(url, objects, callback) {
     //XXX: POST to a URL
     //XXX: set the mimetype and the accept headers!
     // Remember to use application/json !
+    xhr.open(objects["method"], url, true);
+    xhr.setRequestHeader("Content-type", "application/json");
+    xhr.send(JSON.stringify(objects["data"]));
 }
 
 
@@ -57,15 +62,24 @@ world = {};
 
 //XXX: TODO Make this prettier!
 function drawCircle(context,entity) {
+    // Reference: https://cloud.tencent.com/developer/article/1114175
     with(context) {
-        beginPath();              
-        lineWidth = 3;
+        beginPath();
+        lineWidth = 7;
         var x = entity["x"];
         var y = entity["y"];
+        var radius = (entity["radius"])?entity["radius"]:50;
         //moveTo(x,y);
-        fillStyle = entity["colour"];
-        strokeStyle = fillStyle;
-        arc(x, y, (entity["radius"])?entity["radius"]:50, 0, 2.0 * Math.PI, false);  
+        // fillStyle = entity["colour"];
+        var grd=createLinearGradient(x-radius, y-radius, x+radius, y+radius);
+        grd.addColorStop("0", entity["colour1"]);
+        grd.addColorStop("0.3",entity["colour2"]);
+        grd.addColorStop("0.5",entity["colour3"]);
+        grd.addColorStop("0.6",entity["colour4"]);
+        grd.addColorStop("0.8",entity["colour5"]);
+        grd.addColorStop("1.0",entity["colour6"]);
+        strokeStyle = grd;
+        arc(x, y, radius, 0, 2.0 * Math.PI);
         stroke();                                
     }
 }
@@ -135,16 +149,16 @@ function getPosition(e) {
 
 
 function addEntity(entity, data) {
-    world[entity] = data;
-    drawNextFrame(); // (but should we?)
+    // world[entity] = data;
+    // drawNextFrame(); // (but should we?)
     //XXX: Send a XHTML Request that updates the entity you just  modified!
-
+    sendJSONXMLHTTPRequest("/entity/" + entity, {"method": "POST", "data": data}, doNothing);
 }
 
 var counter = 0;
 function addEntityWithoutName(data) {
     //var name = "X"+Math.floor((Math.random()*100)+1);
-    var name = "X"+(counter++)%100;
+    var name = "X"+(counter++);
     addEntity(name,data);
 }
 
@@ -247,26 +261,76 @@ mouse = (function() {
 // Add the application specific mouse listeners!
 //XXX: TODO Make these prettier!
 mouse.mousedowners.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'blue'});
+    addEntityWithoutName({'x':x,'y':y,
+            'colour1':'black','colour2':'magenta','colour3':'blue',
+            'colour4':'green','colour5':'yellow','colour6':'red'});
 });
 
 mouse.mouseuppers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'red'});
+    addEntityWithoutName({'x':x,'y':y,
+            'colour1':'red','colour2':'green','colour3':'lightpink',
+            'colour4':'lightcoral','colour5':'lightcyan','colour6':'white'});
 });
 
+var prevTime = 0
 mouse.mousedraggers.push(function(x,y,clicked,e) {
-    addEntityWithoutName({'x':x,'y':y,'colour':'green',
-                          'radius':10});
+    // Too often, make it more sparse
+    var time = (new Date()).getTime();
+    if(time - prevTime >= 1000 / 50) {     // At most 50 circles for a second
+        prevTime = time;
+        addEntityWithoutName({'x':x,'y':y,
+            'colour1':'lawngreen','colour2':'lightblue','colour3':'green',
+            'colour4':'lightskyblue','colour5':'red','colour6':'yellow','radius':10});
+    }
 });
 
-
+var updatedCounter = 0;
+var updatingName = "";
 function update() {
     //XXX: TODO Get the world from the webservice using a XMLHTTPRequest
+    // Get new circle(If it has)
+    sendJSONXMLHTTPRequest("/new_entity/" + updatingName, {"method": "GET", "data": {}}, updateEntity);
     drawFrame();
 }
 
-// 30 frames per second
-setInterval( update, 1000/30.0);
+function updateEntity(data) {
+    if(updatingName in data) {
+        if(JSON.stringify(data[updatingName]) != JSON.stringify({})) {
+            var temp = updatingName;
+            world[temp] = data[updatingName];
+            updatedCounter = Number(temp.substring(1)) + 1;
+            if(updatedCounter > counter) {
+                counter = updatedCounter;
+            }
+            updatingName = "X"+(updatedCounter);
+            // Get new circle(If it has)
+            sendJSONXMLHTTPRequest("/new_entity/" + updatingName, {"method": "GET", "data": {}}, updateEntity);
+            drawNextFrame();
+        }
+    }
+}
+
+function updateWorld(data) {
+    world = data;
+    console.log(data);
+    // drawNextFrame();
+    for (var key in world) {
+        var id = Number(key.substring(1));
+        if(counter < id) {
+            counter = id;
+        }
+    }
+    updatedCounter = counter;
+    updatingName = "X"+(updatedCounter);
+    // 30 frames per second
+    setInterval( update, 1000/30.0);
+}
+
+function doNothing(data) {
+}
+
+// Read the world first time
+sendJSONXMLHTTPRequest("/world", {"method": "POST", "data": {}}, updateWorld);
 
 
 
